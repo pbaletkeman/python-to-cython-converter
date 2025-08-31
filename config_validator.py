@@ -4,19 +4,32 @@ import sys
 
 REQUIRED_FIELDS = ["input", "output", "transformations"]
 VALID_TRANSFORMATIONS = {
-    "move_nested_classes",
-    "add_hot_function_annotations",
-    "ensure_groupentry_dataclass",
-    "apply_type_inference",
-    "convert_local_variables",
-    "optimize_loops",
-    "convert_numpy_arrays",
-    "clean_decorators",
-    "refine_exceptions",
-    "inline_functions",
-    "apply_parallelization",
     "add_cython_imports",
-    "add_profiling_hooks"
+    "add_hot_function_annotations",
+    "add_profiling",
+    "add_profiling_hooks",
+    "apply_parallelization",
+    "apply_type_inference",
+    "auto_memoryview",
+    "auto_profiling",
+    "check_decorators",
+    "clean_decorators",
+    "convert_local_variables",
+    "convert_numpy",
+    "convert_numpy_arrays",
+    "convert_vars",
+    "detect_dead_code",
+    "ensure_groupentry_dataclass",
+    "generate_benchmark",
+    "generate_call_graph",
+    "infer_types",
+    "inline_functions",
+    "move_nested_classes",
+    "optimize_loops",
+    "parallelize",
+    "refine_exceptions",
+    "score_complexity",
+    "type_signatures"
 }
 
 def validate_config(config_path):

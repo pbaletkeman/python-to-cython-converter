@@ -51,43 +51,43 @@ project/
 ### 🔹 Basic Transformation
 
 ```bash
-python main.py input.py output.pyx
+python cli.py --input input.py --output output.pyx
 ```
 
 ### 🔹 With Class Targeting and Hot Functions
 
 ```bash
-python main.py input.py output.pyx --class MyClass --hot process_data compute_score
+python cli.py --input input.py --output output.pyx --class MyClass --hot process_data compute_score
 ```
 
 ### 🔹 Enable Static Analysis
 
 ```bash
-python main.py input.py output.pyx --analyze
+python cli.py --input input.py --input output.pyx --analyze
 ```
 
 ### 🔹 Generate Benchmark Harness
 
 ```bash
-python main.py input.py output.pyx --benchmark
+python cli.py --input input.py --output output.pyx --benchmark
 ```
 
 ### 🔹 Format and Lint Output
 
 ```bash
-python main.py input.py output.pyx --format
+python cli.py --input input.py --output output.pyx --format
 ```
 
 ### 🔹 Custom HTML Report Name
 
 ```bash
-python main.py input.py output.pyx --report-name my_report.html
+python cli.py --input input.py --output output.pyx --report-name my_report.html
 ```
 
 ### 🔹 Full Example
 
 ```bash
-python main.py input.py output.pyx
+python cli.py --input input.py --output output.pyx
   --class MyClass
   --hot process_data compute_score
   --analyze
@@ -104,8 +104,8 @@ You can define default settings in a `config.json` file:
 
 ```json
 {
-  "input": "src/main.py",
-  "output": "build/main_cython.pyx",
+  "input": "src/file1.py",
+  "output": "build/file1_cython.pyx",
   "target_class": "FastProcessor",
   "hot_functions": ["compute_metrics", "process_batch", "update_state"],
   "dry_run": false,
@@ -134,8 +134,8 @@ You can define default settings in a `config.json` file:
 
 | Switch          | Description                                                            |
 | --------------- | ---------------------------------------------------------------------- |
-| `input.py`      | Path to the input Python file                                          |
-| `output.pyx`    | Path to save the transformed output                                    |
+| `--input`       | Path to the input Python file                                          |
+| `--output`      | Path to save the transformed output                                    |
 | `--class`       | Target class name to convert to `cdef class`                           |
 | `--hot`         | List of hot functions to annotate with `cpdef` and add profiling hooks |
 | `--analyze`     | Run static analysis: complexity, call graph, dead code                 |
