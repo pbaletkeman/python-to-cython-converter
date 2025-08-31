@@ -133,4 +133,9 @@ You can define default settings in a `config.json` file:
 
 ## 🧠 Author
 
-Generated and enhanced by Microsoft Copilot ✨
+Pete Letkeman
+Enhanced by Microsoft Copilot ✨
+
+## 📜 License
+
+This project is licensed under a Custom Non-Commercial License. Commercial use requires written authorization. See the `LICENSE` file for details.
