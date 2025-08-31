@@ -60,6 +60,7 @@ def main():
     # --- Apply Transformations ---
     source = move_nested_classes(source, args.target_class); applied.append("Moved nested classes")
     source = add_hot_function_annotations(source, args.hot, args.target_class); applied.append("Annotated hot functions")
+    source = add_profiling_hooks(source, args.hot); applied.append("Inserted profiling hooks")
     source = ensure_groupentry_dataclass(source); applied.append("Ensured GroupEntry dataclass")
     source = rewrite_function_to_cpdef(source); applied.append("Rewrote functions to cpdef")
     source = add_cython_imports(source); applied.append("Added Cython-specific imports")
@@ -71,7 +72,6 @@ def main():
     source = refine_exceptions(source); applied.append("Refined exception blocks")
     source = inline_functions(source); applied.append("Inlined short functions")
     source = apply_parallelization(source); applied.append("Applied parallelization with prange")    
-    source = add_profiling_hooks(source, args.hot); applied.append("Inserted profiling hooks")
     source = inject_conditional_imports(source); applied.append("conditional Cython imports")
     source = format_cython_code(source); applied.append("Formatted Cython code")
 

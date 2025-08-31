@@ -302,21 +302,26 @@ def move_nested_classes(source: str, hot_functions=None, target_class=None):
             new_lines.append(line)
     return "\n".join(new_lines + nested_classes)
 
-def add_hot_function_annotations(source: str, hot_functions=None, target_class=None):
-    lines = source.splitlines()
-    new_lines = []
-    inside, indent = False, None
-    for line in lines:
-        if target_class and re.match(rf'^\s*class\s+{target_class}\s*[:(]', line):
-            inside, indent = True, len(line) - len(line.lstrip())
-            line = line.replace("class", "cdef class", 1)
-        if inside and len(line) - len(line.lstrip()) <= indent and line.strip():
-            inside = False
-        match = re.match(r'^(\s*)(def|async def)\s+(\w+)\s*\(', line)
-        if match and hot_functions and match.group(3) in hot_functions:
-            line = f"{match.group(1)}cpdef {line.strip()[4:]}"
-        new_lines.append(line)
-    return "\n".join(new_lines)
+def add_hot_function_annotations(source: str, hot_functions: list) -> str:
+    for func_name in hot_functions:
+        # Match function with optional decorators
+        pattern = rf'((?:@\w+\(.*?\)\s*)*)(cpdef|def)\s+{func_name}\s*\(.*?\)\s*->\s*object\s*:'
+        match = re.search(pattern, source)
+        if match:
+            decorators = match.group(1)
+            func_def = match.group(0)
+
+            # Check if decorators already exist
+            if '@boundscheck(False)' not in decorators:
+                decorators += '@boundscheck(False)\n'
+            if '@wraparound(False)' not in decorators:
+                decorators += '@wraparound(False)\n'
+
+            new_func_def = decorators + func_def[len(decorators):]
+            source = source.replace(func_def, new_func_def)
+    return source
+
+
 
 def ensure_groupentry_dataclass(source: str, hot_functions=None, target_class=None):
     if "GroupEntry" in source and "@dataclass" not in source:
@@ -516,14 +521,42 @@ def add_cython_imports(source: str) -> str:
     return "\n".join(new_lines)
 
 
-def add_profiling_hooks(source: str, hot_functions=None, target_class=None):
-    logging.info("Adding profiling hooks to hot functions...")
-    for func in hot_functions or []:
-        pattern = rf'(def|cpdef)\s+{func}\s*\((.*?)\):'
-        replacement = rf'\1 {func}(\2):\n    import time\n    start = time.time()'
-        source = re.sub(pattern, replacement, source)
-        source = re.sub(r'(return .*)', r'\1\n    print("Elapsed:", time.time() - start)', source)
-    return source
+import ast
+import astor
+
+class ProfilingInjector(ast.NodeTransformer):
+    def __init__(self, hot_functions):
+        self.hot_functions = set(hot_functions)
+
+    def visit_FunctionDef(self, node):
+        if node.name in self.hot_functions:
+            # Only inject if not inside a class
+            if not isinstance(getattr(node, 'parent', None), ast.ClassDef):
+                # Check if already injected
+                if not any(isinstance(stmt, ast.Assign) and
+                           isinstance(stmt.targets[0], ast.Name) and
+                           stmt.targets[0].id == 'start'
+                           for stmt in node.body):
+                    # Inject start = time.time()
+                    start_stmt = ast.parse("start = time.time()").body[0]
+                    node.body.insert(0, start_stmt)
+
+                # Inject print after return
+                for i, stmt in enumerate(node.body):
+                    if isinstance(stmt, ast.Return):
+                        print_stmt = ast.parse('print("Elapsed:", time.time() - start)').body[0]
+                        node.body.insert(i + 1, print_stmt)
+        return node
+
+def add_profiling_hooks(source: str, hot_functions: list) -> str:
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        for child in ast.iter_child_nodes(node):
+            child.parent = node  # Track parent for class detection
+    tree = ProfilingInjector(hot_functions).visit(tree)
+    return astor.to_source(tree)
+
+
 
 # --- Static Analysis Tools ---
 

@@ -1,6 +1,6 @@
 {
-  "input": "samples\\input2.py",
-  "output": "samples\\input2.pyx",
+  "input": "samples\\input1.py",
+  "output": "samples\\input1.pyx",
   "target_class": "FastProcessor",
   "hot_functions": [
     "cached_compute",

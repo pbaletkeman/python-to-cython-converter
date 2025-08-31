@@ -104,26 +104,44 @@ You can define default settings in a `config.json` file:
 
 ```json
 {
-  "input": "src/file1.py",
-  "output": "build/file1_cython.pyx",
+  "input": "samples\\input1.py",
+  "output": "samples\\input1.pyx",
   "target_class": "FastProcessor",
-  "hot_functions": ["compute_metrics", "process_batch", "update_state"],
+  "hot_functions": [
+    "cached_compute",
+    "nested_loop",
+    "global_function",
+    "short_inline"
+  ],
   "dry_run": false,
   "verbose": true,
   "transformations": {
-    "move_nested_classes": true,
-    "add_hot_function_annotations": true,
-    "ensure_groupentry_dataclass": true,
-    "apply_type_inference": true,
-    "convert_local_variables": true,
-    "optimize_loops": true,
-    "convert_numpy_arrays": true,
-    "clean_decorators": true,
-    "refine_exceptions": true,
-    "inline_functions": true,
-    "apply_parallelization": true,
     "add_cython_imports": true,
-    "add_profiling_hooks": true
+    "add_hot_function_annotations": true,
+    "add_profiling": true,
+    "add_profiling_hooks": true,
+    "apply_parallelization": true,
+    "apply_type_inference": true,
+    "auto_memoryview": true,
+    "auto_profiling": true,
+    "check_decorators": true,
+    "clean_decorators": true,
+    "convert_local_variables": true,
+    "convert_numpy": true,
+    "convert_numpy_arrays": true,
+    "convert_vars": true,
+    "detect_dead_code": true,
+    "ensure_groupentry_dataclass": true,
+    "generate_benchmark": true,
+    "generate_call_graph": true,
+    "infer_types": true,
+    "inline_functions": true,
+    "move_nested_classes": true,
+    "optimize_loops": true,
+    "parallelize": true,
+    "refine_exceptions": true,
+    "score_complexity": true,
+    "type_signatures": true
   }
 }
 ```

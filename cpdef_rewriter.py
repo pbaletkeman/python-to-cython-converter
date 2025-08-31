@@ -27,6 +27,17 @@ def infer_return_type(func_node):
 import ast
 
 def rewrite_function_to_cpdef(source: str) -> str:
+    def replacer(match):
+        header = match.group(1)
+        if header.startswith("cpdef"):
+            return match.group(0)  # Already rewritten
+        return f"cpdef {header}"
+
+    source = re.sub(r'(?<!cp)def\s+(\w+\s*\(.*?\))', replacer, source)
+    return source
+
+
+def rewrite_function_to_cpdef1(source: str) -> str:
     tree = ast.parse(source)
     lines = source.splitlines()
     rewritten = []

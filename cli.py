@@ -138,13 +138,8 @@ def main():
     print("Loaded transformations:")
     for k, v in config["transformations"].items():
         print(f"  {k}: {v}")
-
     
     validate_settings(settings)
-
-    print("\nFinal Settings:")
-    for key, value in settings.items():
-        print(f"  {key}: {value}")
 
     print_usage_examples()
 

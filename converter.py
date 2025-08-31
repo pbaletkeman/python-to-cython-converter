@@ -63,6 +63,10 @@ def convert(source: str, hot_functions=None, class_name=None, steps=None):
         source = timed_step("Moved nested classes", move_nested_classes, source)
         applied.append("Moved nested classes")
 
+    if steps["add_profiling_hooks"]:
+        source = timed_step("Inserted profiling hooks", add_profiling_hooks, source, hot_functions)
+        applied.append("Inserted profiling hooks")
+        
     if steps["add_hot_function_annotations"]:
         source = timed_step("Annotated hot functions", add_hot_function_annotations, source, hot_functions)
         applied.append("Annotated hot functions")
@@ -107,9 +111,6 @@ def convert(source: str, hot_functions=None, class_name=None, steps=None):
         source = timed_step("Added Cython imports", add_cython_imports, source)
         applied.append("Added Cython imports")
 
-    if steps["add_profiling_hooks"]:
-        source = timed_step("Inserted profiling hooks", add_profiling_hooks, source, hot_functions)
-        applied.append("Inserted profiling hooks")
 
     logging.info("Conversion complete.")
     return source, applied
