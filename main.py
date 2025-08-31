@@ -20,8 +20,12 @@ from transformations import (
     detect_dead_code,
     check_decorator_compatibility,
     generate_benchmark_harness,
-    generate_html_report
+    generate_html_report,
+    add_cython_imports
 )
+from cpdef_rewriter import rewrite_function_to_cpdef
+from cython_formatter import format_cython_code
+
 
 def load_source(path):
     with open(path, 'r', encoding='utf-8') as f:
@@ -56,6 +60,8 @@ def main():
     source = move_nested_classes(source, args.target_class); applied.append("Moved nested classes")
     source = add_hot_function_annotations(source, args.hot, args.target_class); applied.append("Annotated hot functions")
     source = ensure_groupentry_dataclass(source); applied.append("Ensured GroupEntry dataclass")
+    source = rewrite_function_to_cpdef(source); applied.append("Rewrote functions to cpdef")
+    source = add_cython_imports(source); applied.append("Added Cython-specific imports")
     source = apply_type_inference(source); applied.append("Applied type inference")
     source = convert_local_variables(source); applied.append("Converted local variables")
     source = optimize_loops(source); applied.append("Optimized loops")
@@ -63,9 +69,9 @@ def main():
     source = clean_decorators(source); applied.append("Removed unsupported decorators")
     source = refine_exceptions(source); applied.append("Refined exception blocks")
     source = inline_functions(source); applied.append("Inlined short functions")
-    source = apply_parallelization(source); applied.append("Applied parallelization with prange")
-    source = add_cython_imports(source); applied.append("Added Cython-specific imports")
+    source = apply_parallelization(source); applied.append("Applied parallelization with prange")    
     source = add_profiling_hooks(source, args.hot); applied.append("Inserted profiling hooks")
+    source = format_cython_code(source); applied.append("Formatted Cython code")
 
     # --- Optional Analysis ---
     if args.analyze:

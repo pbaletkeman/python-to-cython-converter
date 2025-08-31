@@ -1,0 +1,26 @@
+{
+  "input": "samples/input1.py",
+  "output": "samples/main_cython.pyx",
+  "target_class": "FastProcessor",
+  "hot_functions": [
+    "compute",
+    "global_function"
+  ],
+  "dry_run": false,
+  "verbose": true,
+  "transformations": {
+    "move_nested_classes": true,
+    "add_hot_function_annotations": true,
+    "ensure_groupentry_dataclass": true,
+    "apply_type_inference": true,
+    "convert_local_variables": true,
+    "optimize_loops": true,
+    "convert_numpy_arrays": true,
+    "clean_decorators": true,
+    "refine_exceptions": true,
+    "inline_functions": true,
+    "apply_parallelization": true,
+    "add_cython_imports": true,
+    "add_profiling_hooks": true
+  }
+}

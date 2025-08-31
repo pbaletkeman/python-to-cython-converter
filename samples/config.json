@@ -1,10 +1,8 @@
 {
-  "input_file": "input.py",
-  "output_file": "output.py",
-  "target_class": "MyClass",
-  "hot_functions": ["process_data", "compute_score"],
-  "enable_analysis": true,
-  "enable_benchmark": true,
-  "enable_formatting": true,
-  "report_name": "transformation_report.html"
+  "input": "samples/input1.py",
+  "output": "samples/main_cython.pyx",
+  "target_class": "FastProcessor",
+  "hot_functions": ["compute", "global_function"],
+  "dry_run": false,
+  "verbose": true
 }

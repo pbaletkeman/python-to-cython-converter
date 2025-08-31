@@ -26,7 +26,7 @@ This tool automates the transformation of Python source code into Cython-optimiz
 ## 📦 Installation
 
 ```bash
-pip install black flake8
+pip install black flake8 asttokens astor
 ```
 
 ---
@@ -38,6 +38,7 @@ project/
 ├── main.py
 ├── transformations.py
 ├── config.json   # Optional config file
+├── config_validator.py # verify config.json file is valid
 ├── input.py      # Your source file
 ├── output.py     # Transformed output
 └── transformation_report.html  # Optional HTML report
@@ -50,43 +51,43 @@ project/
 ### 🔹 Basic Transformation
 
 ```bash
-python main.py input.py output.py
+python main.py input.py output.pyx
 ```
 
 ### 🔹 With Class Targeting and Hot Functions
 
 ```bash
-python main.py input.py output.py --class MyClass --hot process_data compute_score
+python main.py input.py output.pyx --class MyClass --hot process_data compute_score
 ```
 
 ### 🔹 Enable Static Analysis
 
 ```bash
-python main.py input.py output.py --analyze
+python main.py input.py output.pyx --analyze
 ```
 
 ### 🔹 Generate Benchmark Harness
 
 ```bash
-python main.py input.py output.py --benchmark
+python main.py input.py output.pyx --benchmark
 ```
 
 ### 🔹 Format and Lint Output
 
 ```bash
-python main.py input.py output.py --format
+python main.py input.py output.pyx --format
 ```
 
 ### 🔹 Custom HTML Report Name
 
 ```bash
-python main.py input.py output.py --report-name my_report.html
+python main.py input.py output.pyx --report-name my_report.html
 ```
 
 ### 🔹 Full Example
 
 ```bash
-python main.py input.py output.py
+python main.py input.py output.pyx
   --class MyClass
   --hot process_data compute_score
   --analyze
@@ -103,14 +104,27 @@ You can define default settings in a `config.json` file:
 
 ```json
 {
-  "input_file": "input.py",
-  "output_file": "output.py",
-  "target_class": "MyClass",
-  "hot_functions": ["process_data", "compute_score"],
-  "enable_analysis": true,
-  "enable_benchmark": true,
-  "enable_formatting": true,
-  "report_name": "transformation_report.html"
+  "input": "src/main.py",
+  "output": "build/main_cython.pyx",
+  "target_class": "FastProcessor",
+  "hot_functions": ["compute_metrics", "process_batch", "update_state"],
+  "dry_run": false,
+  "verbose": true,
+  "transformations": {
+    "move_nested_classes": true,
+    "add_hot_function_annotations": true,
+    "ensure_groupentry_dataclass": true,
+    "apply_type_inference": true,
+    "convert_local_variables": true,
+    "optimize_loops": true,
+    "convert_numpy_arrays": true,
+    "clean_decorators": true,
+    "refine_exceptions": true,
+    "inline_functions": true,
+    "apply_parallelization": true,
+    "add_cython_imports": true,
+    "add_profiling_hooks": true
+  }
 }
 ```
 
@@ -121,7 +135,7 @@ You can define default settings in a `config.json` file:
 | Switch          | Description                                                            |
 | --------------- | ---------------------------------------------------------------------- |
 | `input.py`      | Path to the input Python file                                          |
-| `output.py`     | Path to save the transformed output                                    |
+| `output.pyx`    | Path to save the transformed output                                    |
 | `--class`       | Target class name to convert to `cdef class`                           |
 | `--hot`         | List of hot functions to annotate with `cpdef` and add profiling hooks |
 | `--analyze`     | Run static analysis: complexity, call graph, dead code                 |
@@ -133,7 +147,7 @@ You can define default settings in a `config.json` file:
 
 ## 🧠 Author
 
-Pete Letkeman
+Pete Letkeman  
 Enhanced by Microsoft Copilot ✨
 
 ## 📜 License

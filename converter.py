@@ -1,195 +1,115 @@
-import ast
-import re
-import sys
-import json
-import argparse
 import logging
-from pathlib import Path
+import time
+from transformations import (
+    move_nested_classes,
+    add_hot_function_annotations,
+    ensure_groupentry_dataclass,
+    apply_type_inference,
+    convert_local_variables,
+    optimize_loops,
+    convert_numpy_arrays,
+    clean_decorators,
+    refine_exceptions,
+    inline_functions,
+    apply_parallelization,
+    add_cython_imports,
+    add_profiling_hooks
+)
 
-logging.basicConfig(level=logging.INFO)
+def timed_step(step_name, func, *args, **kwargs):
+    start = time.time()
+    result = func(*args, **kwargs)
+    duration = time.time() - start
+    logging.info(f"{step_name} took {duration:.3f}s")
+    return result
 
-# --- Argument Parsing ---
-def parse_args():
-    parser = argparse.ArgumentParser(description="Convert Python file to Cython-compatible .pyx")
-    parser.add_argument("input", help="Path to the input Python file")
-    parser.add_argument("output", help="Path to the output .pyx file")
-    parser.add_argument("--hot-functions-file", help="Path to file listing hot functions (one per line)")
-    parser.add_argument("--target-class", help="Class to convert to cdef class")
-    parser.add_argument("--config", default="converter_config.json", help="Path to config file")
-    parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing output")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--infer-types", action="store_true")
-    parser.add_argument("--convert-vars", action="store_true")
-    parser.add_argument("--optimize-loops", action="store_true")
-    parser.add_argument("--convert-numpy", action="store_true")
-    parser.add_argument("--clean-decorators", action="store_true")
-    parser.add_argument("--refine-exceptions", action="store_true")
-    parser.add_argument("--inline-functions", action="store_true")
-    parser.add_argument("--parallelize", action="store_true")
-    parser.add_argument("--add-cython-imports", action="store_true")
-    parser.add_argument("--add-profiling", action="store_true")
-    return parser.parse_args()
+def convert(source: str, hot_functions=None, class_name=None, steps=None):
+    """
+    Applies a series of code transformations to convert Python source code
+    into a Cython-compatible version optimized for performance.
 
-# --- Config Loading ---
-def load_config(path):
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except Exception as e:
-        logging.warning(f"Could not load config file: {e}")
-        return {}
+    Parameters:
+        source (str): The original Python source code.
+        hot_functions (list): Names of performance-critical functions to annotate.
+        class_name (str): Optional class name to target for specific transformations.
+        steps (dict): Optional dict to enable/disable specific transformations.
 
-# --- Hot Functions ---
-def load_hot_functions(file_path: str) -> set:
-    hot_funcs = set()
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                func = line.strip()
-                if func:
-                    hot_funcs.add(func)
-        if not hot_funcs:
-            logging.warning("Hot functions file is empty or contains no valid entries.")
-    except Exception as e:
-        logging.error(f"Error reading hot functions file: {e}")
-    return hot_funcs
+    Returns:
+        Tuple[str, List[str]]: Transformed source code and list of applied transformations.
+    """
+    logging.info("Starting conversion pipeline...")
+    applied = []
+    hot_functions = hot_functions or []
 
-def extract_defined_functions_ast(source: str) -> set:
-    try:
-        tree = ast.parse(source)
-        return {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
-    except SyntaxError as e:
-        logging.error(f"Syntax error while parsing source: {e}")
-        return set()
+    default_steps = {
+        "move_nested_classes": True,
+        "add_hot_function_annotations": True,
+        "ensure_groupentry_dataclass": True,
+        "apply_type_inference": True,
+        "convert_local_variables": True,
+        "optimize_loops": True,
+        "convert_numpy_arrays": True,
+        "clean_decorators": True,
+        "refine_exceptions": True,
+        "inline_functions": True,
+        "apply_parallelization": True,
+        "add_cython_imports": True,
+        "add_profiling_hooks": True,
+    }
 
-def validate_hot_functions(hot_funcs: set, defined_funcs: set, verbose=False) -> set:
-    valid = hot_funcs & defined_funcs
-    invalid = hot_funcs - defined_funcs
-    for func in sorted(invalid):
-        logging.warning(f"Function '{func}' not found in source code. Skipping annotation.")
-    if verbose:
-        logging.info(f"Valid hot functions: {sorted(valid)}")
-    return valid
+    steps = steps or default_steps
 
-def find_hot_candidates(source: str) -> set:
-    logging.info("No hot functions file provided. Using static heuristics to detect hot functions...")
-    tree = ast.parse(source)
-    hot_funcs = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            body_len = len(node.body)
-            has_loop = any(isinstance(stmt, (ast.For, ast.While)) for stmt in node.body)
-            uses_numpy = any(
-                isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call) and
-                isinstance(stmt.value.func, ast.Attribute) and
-                getattr(stmt.value.func.value, "id", "") == "np"
-                for stmt in node.body if isinstance(stmt, ast.Expr)
-            )
-            if body_len > 10 or has_loop or uses_numpy:
-                hot_funcs.add(node.name)
-    if not hot_funcs:
-        logging.warning("No hot functions detected using heuristics.")
-    else:
-        logging.info(f"Detected hot functions: {sorted(hot_funcs)}")
-    return hot_funcs
+    if steps["move_nested_classes"]:
+        source = timed_step("Moved nested classes", move_nested_classes, source)
+        applied.append("Moved nested classes")
 
-# --- Transformations ---
-def move_nested_classes(source: str, target_class: str) -> str:
-    if not target_class:
-        return source
-    class_pattern = rf'^\s*class\s+{re.escape(target_class)}\s*[:(]'
-    lines = source.splitlines()
-    new_lines, nested_classes = [], []
-    inside_target_class, indent_level = False, None
-    for line in lines:
-        if re.match(class_pattern, line):
-            inside_target_class = True
-            indent_level = len(line) - len(line.lstrip())
-            new_lines.append(line)
-            continue
-        if inside_target_class:
-            current_indent = len(line) - len(line.lstrip())
-            if current_indent <= indent_level and line.strip():
-                inside_target_class = False
-        if inside_target_class and re.match(r'^\s*class\s+\w+\s*[:(]', line):
-            nested_classes.append(line.lstrip())
-        else:
-            new_lines.append(line)
-    return "\n".join(new_lines + nested_classes)
+    if steps["add_hot_function_annotations"]:
+        source = timed_step("Annotated hot functions", add_hot_function_annotations, source, hot_functions)
+        applied.append("Annotated hot functions")
 
-def add_hot_function_annotations(source: str, hot_functions: set, target_class: str) -> str:
-    lines = source.splitlines()
-    new_lines = []
-    inside_target_class, indent_level = False, None
-    for line in lines:
-        if target_class and re.match(rf'^\s*class\s+{re.escape(target_class)}\s*[:(]', line):
-            inside_target_class = True
-            indent_level = len(line) - len(line.lstrip())
-            line = line.replace("class", "cdef class", 1)
-        if inside_target_class:
-            current_indent = len(line) - len(line.lstrip())
-            if current_indent <= indent_level and line.strip():
-                inside_target_class = False
-        func_match = re.match(r'^(\s*)(def|async def)\s+(\w+)\s*\(', line)
-        if func_match:
-            indent, _, func_name = func_match.groups()
-            if func_name in hot_functions:
-                line = f"{indent}cpdef {line.strip()[4:]}"
-        new_lines.append(line)
-    return "\n".join(new_lines)
+    if steps["ensure_groupentry_dataclass"]:
+        source = timed_step("Ensured GroupEntry is a dataclass", ensure_groupentry_dataclass, source)
+        applied.append("Ensured GroupEntry is a dataclass")
 
-def ensure_groupentry_dataclass(source: str) -> str:
-    if "GroupEntry" in source and "@dataclass" not in source:
-        source = "from dataclasses import dataclass\n\n" + source
-        source = re.sub(r"(class\s+GroupEntry\s*[:(])", r"@dataclass\n\1", source)
-    return source
+    if steps["apply_type_inference"]:
+        source = timed_step("Applied type inference", apply_type_inference, source)
+        applied.append("Applied type inference")
 
-def apply_type_inference(source: str) -> str:
-    logging.info("Applying type inference...")
-    return re.sub(r'def (\w+)\((.*?)\):', r'cpdef \1(\2) -> object:', source)
+    if steps["convert_local_variables"]:
+        source = timed_step("Converted local variables", convert_local_variables, source)
+        applied.append("Converted local variables to cdef")
 
-def convert_local_variables(source: str) -> str:
-    logging.info("Converting local variables to cdef...")
-    return re.sub(r'(\n\s*)(\w+)\s*=\s*(\d+)', r'\1cdef int \2 = \3', source)
+    if steps["optimize_loops"]:
+        source = timed_step("Optimized loops", optimize_loops, source)
+        applied.append("Optimized loops")
 
-def optimize_loops(source: str) -> str:
-    logging.info("Optimizing loops...")
-    return re.sub(r'for (\w+) in range\(', r'cdef int \1\nfor \1 in range(', source)
+    if steps["convert_numpy_arrays"]:
+        source = timed_step("Converted NumPy arrays", convert_numpy_arrays, source)
+        applied.append("Converted NumPy arrays to memoryviews")
 
-def convert_numpy_arrays(source: str) -> str:
-    logging.info("Converting NumPy arrays to memoryviews...")
-    return re.sub(r'np\.zeros\((.*?)\)', r'<double[:,:]> np.zeros(\1)', source)
+    if steps["clean_decorators"]:
+        source = timed_step("Cleaned decorators", clean_decorators, source)
+        applied.append("Cleaned decorators and preserved static/class methods")
 
-def clean_decorators(source: str) -> str:
-    logging.info("Cleaning unsupported decorators...")
-    return re.sub(r'^\s*@staticmethod\s*\n', '', source, flags=re.MULTILINE)
+    if steps["refine_exceptions"]:
+        source = timed_step("Refined exceptions", refine_exceptions, source)
+        applied.append("Refined exception handling")
 
-def refine_exceptions(source: str) -> str:
-    logging.info("Refining exception blocks...")
-    return re.sub(r'except\s*:', 'except Exception:', source)
+    if steps["inline_functions"]:
+        source = timed_step("Inlined functions", inline_functions, source)
+        applied.append("Inlined short functions")
 
-def inline_functions(source: str) -> str:
-    logging.info("Inlining short functions...")
-    return re.sub(r'def (\w+)\((.*?)\):', r'cdef inline \1(\2):', source)
+    if steps["apply_parallelization"]:
+        source = timed_step("Applied parallelization", apply_parallelization, source)
+        applied.append("Applied parallelization")
 
-def apply_parallelization(source: str) -> str:
-    logging.info("Applying parallelization with prange...")
-    source = re.sub(r'for (\w+) in range\(', r'for \1 in prange(', source)
-    if 'from cython.parallel import prange' not in source:
-        source = 'from cython.parallel import prange\n' + source
-    return source
+    if steps["add_cython_imports"]:
+        source = timed_step("Added Cython imports", add_cython_imports, source)
+        applied.append("Added Cython imports")
 
-def add_cython_imports(source: str) -> str:
-    logging.info("Adding Cython-specific imports...")
-    directives = (
-        'from cython import boundscheck, wraparound\n'
-        '@boundscheck(False)\n@wraparound(False)\n'
-    )
-    return directives + source
+    if steps["add_profiling_hooks"]:
+        source = timed_step("Inserted profiling hooks", add_profiling_hooks, source, hot_functions)
+        applied.append("Inserted profiling hooks")
 
-def add_profiling_hooks(source: str, hot_functions: set) -> str:
-    logging.info("Adding profiling hooks to hot functions...")
-    for func in hot_functions:
-        pattern = rf'(def|cpdef)\s+{func}\s*\((.*?)\):'
-        replacement = rf'\1 {func}(\2):\n    import time\n    start = time.time()'
-        source
+    logging.info("Conversion complete.")
+    return source, applied
