@@ -54,46 +54,48 @@ class CpdefTransformer(ast.NodeTransformer):
         node.decorator_list = []
         node.type_comment = None
         return node
+    
+def infer_cdef_types(lines):
+    inferred = []
+    declared_vars = set()
 
-def inject_cython_lines(lines):
-    formatted = []
-    indent_stack = [0]
     for line in lines:
         stripped = line.strip()
 
-        # Handle cdef lines
+        # Skip lines that already declare with cdef
         if stripped.startswith("cdef "):
-            indent = "    " * indent_stack[-1]
-            formatted.append(indent + stripped)
+            inferred.append(line)
+            match = re.match(r"cdef\s+\w+\s+(\w+)", stripped)
+            if match:
+                declared_vars.add(match.group(1))
             continue
 
-        # Handle prange loops
-        if "prange(" in stripped:
-            indent = "    " * indent_stack[-1]
-            formatted.append(indent + stripped)
-            indent_stack.append(indent_stack[-1] + 1)
-            continue
+        # Match simple assignments
+        match = re.match(r"(\w+)\s*=\s*(.+)", stripped)
+        if match:
+            var, value = match.groups()
 
-        # Handle with nogil
-        if "with nogil:" in stripped:
-            indent = "    " * indent_stack[-1]
-            formatted.append(indent + stripped)
-            indent_stack.append(indent_stack[-1] + 1)
-            continue
+            # Skip if already declared
+            if var in declared_vars:
+                inferred.append(line)
+                continue
 
-        # Handle return or end of block
-        if stripped.startswith("return") or stripped == "":
-            if len(indent_stack) > 1:
-                indent_stack.pop()
-            indent = "    " * indent_stack[-1]
-            formatted.append(indent + stripped)
-            continue
+            if value.isdigit():
+                inferred.append(f"cdef int {var} = {value}")
+                declared_vars.add(var)
+            elif re.match(r"\d+\.\d+", value):
+                inferred.append(f"cdef double {var} = {value}")
+                declared_vars.add(var)
+            elif value in {"True", "False"}:
+                inferred.append(f"cdef bint {var} = {value}")
+                declared_vars.add(var)
+            else:
+                inferred.append(line)
+        else:
+            inferred.append(line)
 
-        # Default line
-        indent = "    " * indent_stack[-1]
-        formatted.append(indent + stripped)
+    return inferred
 
-    return formatted
 
 def format_comments_and_docstrings(lines):
     formatted = []
@@ -126,13 +128,13 @@ def cython_formatter(source: str) -> str:
 
     # Step 2: Line-level Cython injection
     lines = python_code.splitlines()
-    cythonized = inject_cython_lines(lines)
+    cythonized = lines #inject_cython_lines(lines)
 
     # Step 3: Comment/docstring formatting
+    # final = format_comments_and_docstrings(cythonized)
     final = format_comments_and_docstrings(cythonized)
 
     return "\n".join(final)
-
 
 def format_memoryviews(lines):
     formatted = []
@@ -158,27 +160,6 @@ def attach_decorators(lines):
             pending_decorators = []
         formatted.append(line)
     return formatted
-
-def infer_cdef_types(lines):
-    inferred = []
-    for line in lines:
-        stripped = line.strip()
-        match = re.match(r"(\w+)\s*=\s*(.+)", stripped)
-        if match:
-            var, value = match.groups()
-            if value.isdigit():
-                inferred.append(f"cdef int {var} = {value}")
-            elif re.match(r"\d+\.\d+", value):
-                inferred.append(f"cdef double {var} = {value}")
-            elif value in {"True", "False"}:
-                inferred.append(f"cdef bint {var} = {value}")
-            else:
-                inferred.append(line)
-        else:
-            inferred.append(line)
-    return inferred
-
-import re
 
 def reindent_cython_blocks(lines):
     INDENT = "    "
@@ -232,7 +213,7 @@ def cython_transform_pipeline(source: str) -> str:
     lines = format_memoryviews(lines)
 
     # Step 3: Type inference
-    lines = infer_cdef_types(lines)
+    # lines = infer_cdef_types(lines)
 
     # Step 4: Final cleanup
     return "\n".join(lines)

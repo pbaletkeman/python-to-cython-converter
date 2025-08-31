@@ -21,7 +21,8 @@ from transformations import (
     check_decorator_compatibility,
     generate_benchmark_harness,
     generate_html_report,
-    add_cython_imports
+    add_cython_imports,
+    inject_conditional_imports
 )
 from cpdef_rewriter import rewrite_function_to_cpdef
 from cython_formatter import format_cython_code
@@ -71,6 +72,7 @@ def main():
     source = inline_functions(source); applied.append("Inlined short functions")
     source = apply_parallelization(source); applied.append("Applied parallelization with prange")    
     source = add_profiling_hooks(source, args.hot); applied.append("Inserted profiling hooks")
+    source = inject_conditional_imports(source); applied.append("conditional Cython imports")
     source = format_cython_code(source); applied.append("Formatted Cython code")
 
     # --- Optional Analysis ---

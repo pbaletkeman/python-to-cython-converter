@@ -175,6 +175,7 @@ def bulletproof_format(source: str) -> str:
         formatted.append(INDENT * ((current_indent + 4) // 4) + stripped)
 
     return "\n".join(formatted)
+
 def fix_indentation(source: str) -> str:
     lines = source.splitlines()
     fixed_lines = []
@@ -217,6 +218,41 @@ def fix_indentation(source: str) -> str:
         fixed_lines.append(current_indent + line.strip())
 
     return "\n".join(fixed_lines)
+
+def inject_conditional_imports(source: str) -> str:
+    lines = source.splitlines()
+
+    # Define feature → import mapping
+    feature_imports = {
+        "prange(": "from cython.parallel import prange",
+        "nogil": "from cython cimport nogil",
+        "cython.boundscheck": "from cython import boundscheck",
+        "cython.wraparound": "from cython import wraparound",
+        "cython.view": "from cython cimport view",
+    }
+
+    # Track which imports are already present
+    existing_imports = set(line.strip() for line in lines if line.strip().startswith("from"))
+
+    # Determine which imports are needed
+    needed_imports = []
+    for feature, import_stmt in feature_imports.items():
+        if any(feature in line for line in lines) and import_stmt not in existing_imports:
+            needed_imports.append(import_stmt)
+
+    # Insert imports after initial comments or existing imports
+    insert_index = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and not stripped.startswith("from"):
+            insert_index = i
+            break
+
+    # Inject imports
+    for import_stmt in reversed(needed_imports):
+        lines.insert(insert_index, import_stmt)
+
+    return "\n".join(lines)
 
 def add_cython_imports(source: str) -> str:
     lines = source.splitlines()
@@ -292,9 +328,46 @@ def apply_type_inference(source: str, hot_functions=None, target_class=None):
     logging.info("Applying type inference...")
     return re.sub(r'def (\w+)\((.*?)\):', r'cpdef \1(\2) -> object:', source)
 
-def convert_local_variables(source: str, hot_functions=None, target_class=None):
-    logging.info("Converting local variables to cdef...")
-    return re.sub(r'(\n\s*)(\w+)\s*=\s*(\d+)', r'\1cdef int \2 = \3', source)
+def convert_local_variables(source: str) -> str:
+    lines = source.splitlines()
+    declared_vars = set()
+    newly_declared = set()
+    rewritten = []
+
+    # First pass: collect declared variables
+    for line in lines:
+        decl_match = re.match(r'\s*cdef\s+\w+(?:\s*\[.*?\])?\s+(\w+)', line)
+        if decl_match:
+            declared_vars.add(decl_match.group(1))
+
+    # Second pass: rewrite assignments
+    for line in lines:
+        assign_match = re.match(r'(\s*)(\w+)\s*=\s*(.+)', line)
+        if assign_match:
+            indent, var_name, value = assign_match.groups()
+
+            # If already declared, just assign
+            if var_name in declared_vars or var_name in newly_declared:
+                rewritten.append(f"{indent}{var_name} = {value}")
+                continue
+
+            # Infer type
+            value_stripped = value.strip()
+            if re.match(r'^\d+$', value_stripped):
+                cython_type = "int"
+            elif re.match(r'^\d+\.\d+$', value_stripped):
+                cython_type = "double"
+            else:
+                cython_type = "object"
+
+            # Declare and assign
+            rewritten.append(f"{indent}cdef {cython_type} {var_name}")
+            rewritten.append(f"{indent}{var_name} = {value}")
+            newly_declared.add(var_name)
+        else:
+            rewritten.append(line)
+
+    return "\n".join(rewritten)
 
 def optimize_loops(source: str, hot_functions=None, target_class=None):
     logging.info("Optimizing loops...")

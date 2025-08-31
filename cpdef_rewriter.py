@@ -24,46 +24,43 @@ def infer_return_type(func_node):
     return "object"
 
 
+import ast
+
 def rewrite_function_to_cpdef(source: str) -> str:
+    tree = ast.parse(source)
     lines = source.splitlines()
     rewritten = []
     buffer = []
     inside_function = False
     indent = ""
 
-    for line in lines:
-        stripped = line.strip()
-
-        # Buffer decorators
-        if stripped.startswith("@") and not inside_function:
-            buffer.append(line)
-            continue
-
-        # Detect function header
-        def_match = re.match(r'^(\s*)(def|cpdef)\s+(\w+)\s*\(.*\)\s*->\s*\w+\s*:', line)
-        if def_match:
-            indent, keyword, name = def_match.groups()
-
-            # Avoid double cpdef
-            if keyword == "cpdef":
-                header = line
-            else:
-                header = line.replace("def", "cpdef", 1)
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef):
+            return_type = infer_return_type(node)
+            header_line = lines[node.lineno - 1]
+            indent_match = re.match(r'^(\s*)', header_line)
+            indent = indent_match.group(1) if indent_match else ""
+            args = ", ".join([arg.arg for arg in node.args.args])
+            new_header = f"{indent}cpdef {return_type} {node.name}({args}):"
 
             # Flush decorators + header
             rewritten.extend(buffer)
             buffer.clear()
-            rewritten.append(header)
+            rewritten.append(new_header)
             inside_function = True
             continue
 
-        # Detect end of function (naively: dedent or blank line after body)
-        if inside_function and (stripped == "" or not line.startswith(indent + "    ")):
-            inside_function = False
-            buffer.clear()
+        # Handle decorators
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            buffer.append(lines[node.lineno - 1])
+            continue
 
-        rewritten.append(line)
+    # Fallback: return original if no match
+    if not rewritten:
+        return source
+
+    # Append remaining lines
+    for i in range(node.lineno, len(lines)):
+        rewritten.append(lines[i])
 
     return "\n".join(rewritten)
-
-
