@@ -1,0 +1,4 @@
+compute_average
+threaded_sum
+save_to_file
+global_loader
